@@ -2,26 +2,23 @@ import express from "express";
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer } from "http";
 import { v4 as uuidv4 } from "uuid"; // Import UUID for unique player IDs
-import { addPlayerToRoom } from "./utils";
-import { rooms as roomUtils } from "./utils";
+import { addPlayerToRoom, rollDice, trackTurn, updatePlayerTurn } from "./utils";
+import { rooms, checkGameLogic } from "./utils";
+import { Player } from "./types";
 
 const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
 // Keep track of players with their room codes
-interface Player {
-    id: string;
-    name: string;
-    room: string;
-}
+
 
 const players: Player[] = [];
-const rooms: Record<string, WebSocket[]> = {}; // Store room connections
+const roomSockets: Record<string, WebSocket[]> = {};
 
 // Broadcast message to all players in a room
 function broadcast(roomCode: string, message: any) {
-    rooms[roomCode]?.forEach((client) => {
+    roomSockets[roomCode]?.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify(message));
         }
@@ -29,7 +26,7 @@ function broadcast(roomCode: string, message: any) {
 }
 
 wss.on("connection", (ws) => {
-    console.log("A player connected");
+
 
     ws.on("message", (data) => {
         const message = JSON.parse(data.toString());
@@ -41,7 +38,7 @@ wss.on("connection", (ws) => {
                 console.log("room code", roomCode);
                 const playerID = uuidv4(); // Generate a unique player ID
 
-                rooms[roomCode] = [ws];
+                roomSockets[roomCode] = [ws];
                 addPlayerToRoom(roomCode, playerID, message.name);
 
                 console.log(`Player ${message.name} created room ${roomCode} with ID ${playerID}`);
@@ -52,11 +49,21 @@ wss.on("connection", (ws) => {
 
             case "join-room":
                 const { roomCode: joinRoomCode, name } = message;
+
+
+
+
+                if (!rooms[joinRoomCode]) return ws.send(JSON.stringify({ type: "room-not-found" }));
+
+
+
+
                 if (rooms[joinRoomCode] && rooms[joinRoomCode].length < 4) {
                     const joinedPlayerID = uuidv4(); // Generate a unique player ID
-                    rooms[joinRoomCode].push(ws);
+
 
                     ws.send(JSON.stringify({ type: "player-joined", playerId: joinedPlayerID }));
+                    roomSockets[joinRoomCode].push(ws);
                     addPlayerToRoom(joinRoomCode, joinedPlayerID, name);
 
                     console.log(`Player ${name} joined room ${joinRoomCode} with ID ${joinedPlayerID}`);
@@ -64,7 +71,8 @@ wss.on("connection", (ws) => {
                     broadcast(joinRoomCode, {
                         type: "player-joined",
                         players: rooms[joinRoomCode].length,
-                        playerID: joinedPlayerID
+                        playerID: joinedPlayerID,
+                        allPlayers: rooms[joinRoomCode],
                     });
                 } else {
                     ws.send(JSON.stringify({ type: "room-full" }));
@@ -72,16 +80,24 @@ wss.on("connection", (ws) => {
                 break;
 
             case "roll-dice":
-                const { diceValue, playerID: dicePlayerID, roomCode: diceRoomCode } = message;
-                console.log("message rice roll :", message)
-                console.log("Player rolled:", diceValue, "Player ID:", dicePlayerID);
+                const { playerId: currentPlayerId, roomCode: diceRoomCode } = message;
 
-                // Broadcast the roll to all players in the room
-                broadcast(diceRoomCode, { type: "dice-rolled", dicePlayerID, diceValue });
-                // check player started or not  via player id
+                console.log(`trackTurn : ${JSON.stringify(trackTurn, null, 2)}`);
 
-                // if yes then update the player position with dice value with the player id
 
+                const diceValue = rollDice();
+                const player = rooms[diceRoomCode].find(p => p.id === currentPlayerId);
+                let newPosition = player?.position;
+                if (player) {
+                    newPosition = checkGameLogic(player, diceValue);
+
+                }
+
+
+                broadcast(diceRoomCode, { diceValue: diceValue, playerId: currentPlayerId, position: newPosition });
+
+                const nextPlayerId: string | null = updatePlayerTurn(diceRoomCode);
+                broadcast(diceRoomCode, { type: "player-turn", playerId: nextPlayerId });
                 break;
 
             case "player-move":
@@ -98,16 +114,13 @@ wss.on("connection", (ws) => {
         console.log("A player disconnected");
 
         // Remove player from the players list
-        Object.keys(rooms).forEach((roomCode) => {
-            rooms[roomCode] = rooms[roomCode].filter((client) => client !== ws);
-            if (rooms[roomCode].length === 0) delete rooms[roomCode];
-        });
+
 
         // Remove player from tracking
-        for (let i = players.length - 1; i >= 0; i--) {
-            if (!rooms[players[i].room]) {
-                console.log(`Removing player ${players[i].name} from tracking`);
-                players.splice(i, 1);
+        for (const [roomCode, sockets] of Object.entries(roomSockets)) {
+            roomSockets[roomCode] = sockets.filter((client) => client !== ws);
+            if (roomSockets[roomCode].length === 0) {
+                delete roomSockets[roomCode]; // Remove empty room from roomSockets
             }
         }
     });
