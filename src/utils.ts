@@ -120,6 +120,9 @@ export function updatePlayerTurn(roomId: string): string | null {
     // Increment the turn index, wrapping around using modulo
     trackTurn[roomId] = (trackTurn[roomId] + 1) % totalPlayers;
 
+    console.log(`trackTurn[${roomId}] : ${trackTurn[roomId]}`);
+    console.log(`trackTurn>>> ${(trackTurn[roomId] + 1) % totalPlayers}`)
+
     // Get the player whose turn it is
     const currentPlayer = rooms[roomId][trackTurn[roomId]];
     console.log(`Updated turn: ${currentPlayer.name} (${currentPlayer.id})`);
