@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid"; // Import UUID for unique player IDs
 import { addPlayerToRoom, rollDice, trackTurn, updatePlayerTurn } from "./utils";
 import { rooms, checkGameLogic } from "./utils";
 import { Player } from "./types";
+import { json } from "stream/consumers";
 
 const app = express();
 const server = createServer(app);
@@ -26,7 +27,9 @@ function broadcast(roomCode: string, message: any) {
 }
 
 wss.on("connection", (ws) => {
-
+    ws.on("error", (error) => {
+        console.error("WebSocket error:", error);
+    });
 
     ws.on("message", (data) => {
         const message = JSON.parse(data.toString());
@@ -34,18 +37,21 @@ wss.on("connection", (ws) => {
 
         switch (message.type) {
             case "create-room":
-                const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                console.log("room code", roomCode);
-                const playerID = uuidv4(); // Generate a unique player ID
 
-                roomSockets[roomCode] = [ws];
-                addPlayerToRoom(roomCode, playerID, message.name);
+                if (ws.readyState === WebSocket.OPEN) {
+                    const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    const playerID = uuidv4(); // Generate a unique player ID
 
-                console.log(`Player ${message.name} created room ${roomCode} with ID ${playerID}`);
-                console.log(players);
+                    roomSockets[roomCode] = [ws];
+                    addPlayerToRoom(roomCode, playerID, message.name);
 
-                ws.send(JSON.stringify({ type: "room-created", roomCode, playerID }));
-                break;
+                    console.log(`Player ${message.name} created room ${roomCode} with ID ${playerID}`);
+                    console.log(players);
+
+                    ws.send(JSON.stringify({ type: "room-created", roomCode, playerID }));
+                    break;
+                }
+
 
             case "join-room":
                 const { roomCode: joinRoomCode, name } = message;
@@ -80,9 +86,13 @@ wss.on("connection", (ws) => {
                 break;
 
             case "roll-dice":
-                const { playerId: currentPlayerId, roomCode: diceRoomCode } = message;
 
-                console.log(`trackTurn : ${JSON.stringify(trackTurn, null, 2)}`);
+                // // const { playerId: currentPlayerId, roomCode: diceRoomCode } = message;
+                const currentPlayerId = message.playerId;
+                const diceRoomCode = message.roomCode;
+                console.log(`playerId : ${currentPlayerId}`);
+                console.log(`roomCode : ${diceRoomCode}`);
+
 
 
                 const diceValue = rollDice();
@@ -93,6 +103,8 @@ wss.on("connection", (ws) => {
 
                 }
 
+
+                // ws.send(JSON.stringify({ type: "dice-rolled", diceValue, playerId: currentPlayerId, position: newPosition }));
 
                 broadcast(diceRoomCode, { diceValue: diceValue, playerId: currentPlayerId, position: newPosition });
 
