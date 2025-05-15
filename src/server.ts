@@ -96,7 +96,7 @@ wss.on("connection", (ws) => {
                 const nPlayerId: string | null = updatePlayerTurn(roomCode);
                 console.log("hi, i reached here");
                 broadcast(roomCode, { type: "player-turn", playerId: nPlayerId });
-
+                break;
             case "roll-dice":
 
                 // // const { playerId: currentPlayerId, roomCode: diceRoomCode } = message;
@@ -115,10 +115,24 @@ wss.on("connection", (ws) => {
 
                 }
 
-
+                if (newPosition === 100) {
+                    ws.send(JSON.stringify({ type: "game-over", playerId: currentPlayerId }));
+                }
                 // ws.send(JSON.stringify({ type: "dice-rolled", diceValue, playerId: currentPlayerId, position: newPosition }));
 
                 broadcast(diceRoomCode, { type: "dice-rolled", diceValue, playerId: currentPlayerId, position: newPosition });
+                if (player?.started === true) {
+                    if (diceValue === 6 || diceValue === 1) {
+                        broadcast(diceRoomCode, { type: "player-turn", playerId: currentPlayerId });
+                        break;
+                    }
+                }
+                else {
+                    if (diceValue === 6) {
+                        broadcast(diceRoomCode, { type: "player-turn", playerId: currentPlayerId });
+                        break;
+                    }
+                }
 
                 const nextPlayerId: string | null = updatePlayerTurn(diceRoomCode);
                 broadcast(diceRoomCode, { type: "player-turn", playerId: nextPlayerId });
