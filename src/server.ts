@@ -48,7 +48,7 @@ wss.on("connection", (ws) => {
                     console.log(`Player ${message.name} created room ${roomCode} with ID ${playerID}`);
                     console.log(players);
 
-                    ws.send(JSON.stringify({ type: "room-created", roomCode, playerID }));
+                    ws.send(JSON.stringify({ type: "room-created", roomCode, playerID, players: rooms[roomCode].length }));
                     break;
                 }
 
@@ -68,7 +68,8 @@ wss.on("connection", (ws) => {
                     const joinedPlayerID = uuidv4(); // Generate a unique player ID
 
 
-                    ws.send(JSON.stringify({ type: "player-joined", playerId: joinedPlayerID }));
+                    ws.send(JSON.stringify({ type: "joined-success", playerId: joinedPlayerID }));
+
                     roomSockets[joinRoomCode].push(ws);
                     addPlayerToRoom(joinRoomCode, joinedPlayerID, name);
 
@@ -84,6 +85,17 @@ wss.on("connection", (ws) => {
                     ws.send(JSON.stringify({ type: "room-full" }));
                 }
                 break;
+
+            case "start-game":
+                console.log("hi, i am start-game");
+                const { roomCode } = message;
+                console.log(`room code : ${roomCode}`);
+                console.log(rooms[roomCode]);
+                if (!rooms[roomCode]) return ws.send(JSON.stringify({ type: "room-not-found" }));
+                if (rooms[roomCode].length < 2) return ws.send(JSON.stringify({ type: "not-enough-players" }));
+                const nPlayerId: string | null = updatePlayerTurn(roomCode);
+                console.log("hi, i reached here");
+                broadcast(roomCode, { type: "player-turn", playerId: nPlayerId });
 
             case "roll-dice":
 
@@ -106,7 +118,7 @@ wss.on("connection", (ws) => {
 
                 // ws.send(JSON.stringify({ type: "dice-rolled", diceValue, playerId: currentPlayerId, position: newPosition }));
 
-                broadcast(diceRoomCode, { diceValue: diceValue, playerId: currentPlayerId, position: newPosition });
+                broadcast(diceRoomCode, { type: "dice-rolled", diceValue, playerId: currentPlayerId, position: newPosition });
 
                 const nextPlayerId: string | null = updatePlayerTurn(diceRoomCode);
                 broadcast(diceRoomCode, { type: "player-turn", playerId: nextPlayerId });
