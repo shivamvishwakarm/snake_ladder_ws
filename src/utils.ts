@@ -87,12 +87,14 @@ export function checkGameLogic(player: Player, diceValue: number) {
     if (player.started === false) {
         if (diceValue === 6 || diceValue === 1) {
             player.started = true;
-            player.position += diceValue;
+            player.position = 1;
 
         }
         return player.position
     }
     let newPosition: number = player.position + diceValue;
+
+
 
     if (snakes[newPosition]) {
         newPosition = snakes[newPosition];
@@ -101,6 +103,11 @@ export function checkGameLogic(player: Player, diceValue: number) {
         newPosition = ladders[newPosition];
 
     }
+
+    if (newPosition > 100) {
+        return player.position;
+    }
+
     player.position = newPosition;
     return player.position;
 }
