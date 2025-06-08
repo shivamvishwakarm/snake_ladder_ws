@@ -82,7 +82,7 @@ export function rollDice(): number {
 
 
 // return new position
-export function checkGameLogic(player: Player, diceValue: number) {
+export function checkGameLogic(player: Player, diceValue: number): number {
 
     if (player.started === false) {
         if (diceValue === 6 || diceValue === 1) {
@@ -127,12 +127,10 @@ export function updatePlayerTurn(roomId: string): string | null {
     // Increment the turn index, wrapping around using modulo
     trackTurn[roomId] = (trackTurn[roomId] + 1) % totalPlayers;
 
-    console.log(`trackTurn[${roomId}] : ${trackTurn[roomId]}`);
-    console.log(`trackTurn>>> ${(trackTurn[roomId] + 1) % totalPlayers}`)
+
 
     // Get the player whose turn it is
     const currentPlayer = rooms[roomId][trackTurn[roomId]];
-    console.log(`Updated turn: ${currentPlayer.name} (${currentPlayer.id})`);
 
     return currentPlayer.id; // Return the ID of the player whose turn it is
 }
