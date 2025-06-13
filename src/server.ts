@@ -175,4 +175,8 @@ wss.on("connection", (ws) => {
     });
 });
 
+app.get("/health", (req, res) => {
+    res.status(200).send("OK");
+})
+
 server.listen(4000, () => console.log("WebSocket Server running on port 4000"));
