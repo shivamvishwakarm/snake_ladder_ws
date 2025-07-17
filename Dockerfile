@@ -11,7 +11,7 @@ RUN npm install -g typescript
 RUN npm run build
 
 # Expose your WebSocket port (optional)
-EXPOSE 4000
+EXPOSE 80
 
 # Start the server
 CMD ["node", "dist/server.js"]
