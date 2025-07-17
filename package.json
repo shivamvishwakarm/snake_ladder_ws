@@ -17,6 +17,7 @@
     "express": "^5.1.0",
     "http": "^0.0.1-security",
     "uuid": "^11.1.0",
+    "winston": "^3.17.0",
     "ws": "^8.18.1"
   },
   "devDependencies": {

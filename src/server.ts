@@ -1,3 +1,4 @@
+
 import express from "express";
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer } from "http";
@@ -10,11 +11,12 @@ import {
 } from "./utils";
 import { rooms, checkGameLogic } from "./utils";
 import { Player } from "./types";
+import { logger } from "./logger";
 
 const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
-
+const playerSessions: Record<string, { roomCode: string; socket: WebSocket }> = {};
 // Keep track of players with their room codes
 
 const players: Player[] = [];
@@ -31,12 +33,13 @@ function broadcast(roomCode: string, message: any) {
 
 wss.on("connection", (ws) => {
     ws.on("error", (error) => {
-        console.error("WebSocket error:", error);
+        logger.error("WebSocket error", { error });
     });
 
     ws.on("message", (data) => {
         const message = JSON.parse(data.toString());
-        console.log("Received message:", message);
+
+
 
         switch (message.type) {
             case "create-room":
@@ -46,8 +49,9 @@ wss.on("connection", (ws) => {
                         .substring(2, 8)
                         .toUpperCase();
                     const playerID = uuidv4(); // Generate a unique player ID
-
+                    playerSessions[playerID] = { roomCode, socket: ws };
                     roomSockets[roomCode] = [ws];
+                    logger.info("Player created", { playerID, roomCode });
                     addPlayerToRoom(roomCode, playerID, message.name);
 
                     ws.send(
@@ -69,6 +73,7 @@ wss.on("connection", (ws) => {
 
                 if (rooms[joinRoomCode] && rooms[joinRoomCode].length < 4) {
                     const joinedPlayerID = uuidv4(); // Generate a unique player ID
+                    logger.info("Player joined", { joinedPlayerID, joinRoomCode });
 
                     ws.send(
                         JSON.stringify({ type: "joined-success", playerId: joinedPlayerID })
@@ -90,6 +95,13 @@ wss.on("connection", (ws) => {
 
             case "start-game":
                 const { roomCode } = message;
+                // if (!message.playerId || !playerSessions[message.playerId]) {
+                //     return ws.send(JSON.stringify({ type: "unauthorized" }));
+                // }
+
+                // if (playerSessions[message.playerId].socket !== ws) {
+                //     return ws.send(JSON.stringify({ type: "unauthorized" }));
+                // }
 
                 if (!rooms[roomCode])
                     return ws.send(JSON.stringify({ type: "room-not-found" }));
@@ -157,19 +169,64 @@ wss.on("connection", (ws) => {
                     newPosition: message.newPosition,
                 });
                 break;
+
+            case "reconnect":
+                const { playerId, roomCode: reconnectRoomCode } = message;
+
+                if (!rooms[reconnectRoomCode]) {
+                    return ws.send(JSON.stringify({ type: "room-not-found" }));
+                }
+
+                // Rebind the socket to playerId
+                playerSessions[playerId] = { roomCode: reconnectRoomCode, socket: ws };
+
+                if (!roomSockets[reconnectRoomCode].includes(ws)) {
+                    roomSockets[reconnectRoomCode].push(ws);
+                }
+
+                ws.send(JSON.stringify({
+                    type: "reconnected",
+                    roomCode,
+                    playerId,
+                    players: rooms[reconnectRoomCode],
+                }));
+
+                broadcast(reconnectRoomCode, {
+                    type: "player-reconnected",
+                    playerId,
+                });
+                break;
         }
     });
 
     ws.on("close", () => {
         console.log("A player disconnected");
 
-        // Remove player from the players list
+        // Remove from playerSessions
+        for (const [playerId, session] of Object.entries(playerSessions)) {
+            if (session.socket === ws) {
+                const roomCode = session.roomCode;
 
-        // Remove player from tracking
-        for (const [roomCode, sockets] of Object.entries(roomSockets)) {
-            roomSockets[roomCode] = sockets.filter((client) => client !== ws);
-            if (roomSockets[roomCode].length === 0) {
-                delete roomSockets[roomCode]; // Remove empty room from roomSockets
+                // Remove player from room
+                rooms[roomCode] = rooms[roomCode].filter(p => p.id !== playerId);
+                delete playerSessions[playerId];
+
+                // Remove socket
+                roomSockets[roomCode] = roomSockets[roomCode].filter(s => s !== ws);
+
+                // If room is now empty, delete it
+                if (roomSockets[roomCode].length === 0) {
+                    delete rooms[roomCode];
+                    delete roomSockets[roomCode];
+                    console.log(`Room ${roomCode} deleted (empty)`);
+                }
+
+                // Notify other players
+                broadcast(roomCode, {
+                    type: "player-disconnected",
+                    playerId,
+                    players: rooms[roomCode],
+                });
             }
         }
     });
@@ -178,5 +235,12 @@ wss.on("connection", (ws) => {
 app.get("/health", (req, res) => {
     res.status(200).send("OK");
 })
+app.get("/", (req, res) => {
+    res.status(200).send("OK");
+})
 
-server.listen(4000, () => console.log("WebSocket Server running on port 4000"));
+// server.listen(4000, () => console.log("WebSocket Server running on port 4000"));
+const PORT = process.env.PORT || 80;
+server.listen(PORT, () => {
+    console.log(`WebSocket Server running on port ${PORT}`);
+});
