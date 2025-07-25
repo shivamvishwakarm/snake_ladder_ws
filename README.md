@@ -1,9 +1,9 @@
-#set up project
+# Snake & Ladder WebSocket Server 🎲🐍🪜
 
-git clone - https://github.com/shivamvishwakarm/snake_ladder_ws
+A multiplayer WebSocket-based Snake & Ladder game server built in TypeScript. Lightweight, flexible, and NPM-ready.
 
-cd snake_ladder_ws
+## 🚀 Getting Started
 
-npm install
+```bash
+npm install snake-ladder-ws
 
-npm run dev

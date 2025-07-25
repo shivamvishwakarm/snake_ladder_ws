@@ -1,7 +1,5 @@
-import { start } from "repl";
 import { snakes, ladders } from "./constants";
-import { log } from "console";
-import { transcode } from "buffer";
+
 
 // Define player type
 export type Player = {
@@ -12,67 +10,114 @@ export type Player = {
     started: boolean;
 };
 
-// Define rooms object where roomId is the key, and its value is an array of players
-export const rooms: Record<string, Player[]> = {};
-export const trackTurn: Record<string, number> = {};
-// Function to add a player to a room
-export function addPlayerToRoom(roomId: string, playerId: string, playerName: string, started: boolean = false): void {
-    if (!rooms[roomId]) {
-        rooms[roomId] = []; // Create the room if it doesn't exist
+
+
+export function createGameRoomManager(maxPlayers: number = 4) {
+
+    // Define rooms object where roomId is the key, and its value is an array of players
+    const rooms: Record<string, Player[]> = {};
+    const trackTurn: Record<string, number> = {};
+
+
+    // Function to add a player to a room
+    function addPlayerToRoom(roomId: string, playerId: string, playerName: string, started: boolean = false): void {
+        if (!rooms[roomId]) {
+            rooms[roomId] = []; // Create the room if it doesn't exist
+        }
+
+
+        rooms[roomId].push({
+            id: playerId,
+            name: playerName,
+            diceValue: 0,  // Default dice value
+            position: 0,    // Default position
+            started: started
+        });
+        console.log(`rooms : ${JSON.stringify(rooms, null, 2)}`);
+        console.log(`rooms[${roomId}] : ${JSON.stringify(rooms[roomId], null, 2)}`);
     }
 
 
-    rooms[roomId].push({
-        id: playerId,
-        name: playerName,
-        diceValue: 0,  // Default dice value
-        position: 0,    // Default position
-        started: started
-    });
-    console.log(`rooms : ${JSON.stringify(rooms, null, 2)}`);
-    console.log(`rooms[${roomId}] : ${JSON.stringify(rooms[roomId], null, 2)}`);
-}
 
-// Function to get all players in a specific room
-export function getPlayersInRoom(roomId: string): Player[] {
-    return rooms[roomId] || []; // Return players or an empty array if no room exists
-}
+    /* update player turn*/
+    function updatePlayerTurn(roomId: string): string | null {
+        // Ensure the room exists and has players
+        if (!rooms[roomId] || rooms[roomId].length === 0) return null;
 
-// Function to update a player's dice value
-export function updateDiceValue(roomId: string, playerId: string, newDiceValue: number): boolean {
-    if (!rooms[roomId]) return false;
+        const totalPlayers = rooms[roomId].length;
 
-    const player = rooms[roomId].find(p => p.id === playerId);
-    if (player) {
-        player.diceValue = newDiceValue;
+        // Initialize the turn tracker for the room if not already set
+        if (trackTurn[roomId] === undefined) {
+            trackTurn[roomId] = 0; // Start at the first player
+        }
+
+        // Increment the turn index, wrapping around using modulo
+        trackTurn[roomId] = (trackTurn[roomId] + 1) % totalPlayers;
+
+
+
+        // Get the player whose turn it is
+        const currentPlayer = rooms[roomId][trackTurn[roomId]];
+
+        return currentPlayer.id; // Return the ID of the player whose turn it is
+    }
+
+    /* remove player from room*/
+    function removePlayerFromRoom(roomId: string, playerId: string): boolean {
+        if (!rooms[roomId]) return false;
+
+        rooms[roomId] = rooms[roomId].filter(p => p.id !== playerId);
+
+        // If the room is empty after removal, delete it
+        if (rooms[roomId].length === 0) {
+            delete rooms[roomId];
+        }
         return true;
     }
-    return false;
-}
 
-// Function to update a player's position
-export function updatePlayerPosition(roomId: string, playerId: string, newPosition: number): boolean {
-    if (!rooms[roomId]) return false;
 
-    const player = rooms[roomId].find(p => p.id === playerId);
-    if (player) {
-        player.position = newPosition;
-        return true;
+
+    // Function to get all players in a specific room
+    function getPlayersInRoom(roomId: string): Player[] {
+        return rooms[roomId] || []; // Return players or an empty array if no room exists
     }
-    return false;
-}
 
-// Function to remove a player from a room
-export function removePlayerFromRoom(roomId: string, playerId: string): boolean {
-    if (!rooms[roomId]) return false;
+    // Function to update a player's dice value
+    function updateDiceValue(roomId: string, playerId: string, newDiceValue: number): boolean {
+        if (!rooms[roomId]) return false;
 
-    rooms[roomId] = rooms[roomId].filter(p => p.id !== playerId);
-
-    // If the room is empty after removal, delete it
-    if (rooms[roomId].length === 0) {
-        delete rooms[roomId];
+        const player = rooms[roomId].find(p => p.id === playerId);
+        if (player) {
+            player.diceValue = newDiceValue;
+            return true;
+        }
+        return false;
     }
-    return true;
+
+    // Function to update a player's position
+    function updatePlayerPosition(roomId: string, playerId: string, newPosition: number): boolean {
+        if (!rooms[roomId]) return false;
+
+        const player = rooms[roomId].find(p => p.id === playerId);
+        if (player) {
+            player.position = newPosition;
+            return true;
+        }
+        return false;
+    }
+
+
+    return {
+        rooms,
+        trackTurn,
+        addPlayerToRoom,
+        removePlayerFromRoom,
+        updatePlayerTurn,
+        getPlayersInRoom,
+        updateDiceValue,
+        updatePlayerPosition
+    };
+
 }
 
 export function rollDice(): number {
@@ -81,8 +126,10 @@ export function rollDice(): number {
 
 
 
+
+
 // return new position
-export function checkGameLogic(player: Player, diceValue: number): number {
+export function checkGameLogic(player: Player, diceValue: number, snakes: Record<number, number>, ladders: Record<number, number>): number {
 
     if (player.started === false) {
         if (diceValue === 6 || diceValue === 1) {
@@ -112,25 +159,3 @@ export function checkGameLogic(player: Player, diceValue: number): number {
     return player.position;
 }
 
-
-export function updatePlayerTurn(roomId: string): string | null {
-    // Ensure the room exists and has players
-    if (!rooms[roomId] || rooms[roomId].length === 0) return null;
-
-    const totalPlayers = rooms[roomId].length;
-
-    // Initialize the turn tracker for the room if not already set
-    if (trackTurn[roomId] === undefined) {
-        trackTurn[roomId] = 0; // Start at the first player
-    }
-
-    // Increment the turn index, wrapping around using modulo
-    trackTurn[roomId] = (trackTurn[roomId] + 1) % totalPlayers;
-
-
-
-    // Get the player whose turn it is
-    const currentPlayer = rooms[roomId][trackTurn[roomId]];
-
-    return currentPlayer.id; // Return the ID of the player whose turn it is
-}
