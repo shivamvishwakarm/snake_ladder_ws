@@ -1,0 +1,46 @@
+# .github/workflows/npm-publish.yml
+name: 🚀 Publish to NPM
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'dist/**'
+      - 'package.json'
+      - '.github/workflows/npm-publish.yml'
+
+jobs:
+  publish:
+    name: 📦 Auto Version & NPM Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # Required to push back changes
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: 📥 Install Dependencies
+        run: npm ci
+
+      - name: 📦 Build Package
+        run: npm run build
+
+      - name: 🔖 Bump Version (Patch)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          npm version patch -m "ci: bump version to %s"
+          git push origin main --follow-tags
+
+      - name: 🚀 Publish to NPM
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
