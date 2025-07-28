@@ -12,7 +12,7 @@ on:
 
 jobs:
   publish:
-    name: 📦 Auto Version & NPM Publish
+    name: 📦 Publish to NPM
     runs-on: ubuntu-latest
 
     steps:
