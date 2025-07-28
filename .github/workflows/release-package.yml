@@ -31,10 +31,10 @@ jobs:
       - name: 🏗️ Build package
         run: npm run build
 
-      - name: 🔖 Bump version
-        run: |
-          npm version patch -m "ci: bump version to %s"
-          git push origin main --follow-tags
+    #   - name: 🔖 Bump version
+    #     run: |
+    #       npm version patch -m "ci: bump version to %s"
+    #       git push origin main --follow-tags
         env:
           GIT_COMMITTER_NAME: github-actions
           GIT_COMMITTER_EMAIL: github-actions@github.com
