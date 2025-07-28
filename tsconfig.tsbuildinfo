@@ -1,1 +1,1 @@
-{"root":["./src/gamemanager.ts","./src/constants.ts","./src/dev-server.ts","./src/index.ts","./src/logger.ts","./src/types.ts","./src/utils.ts"],"version":"5.7.3"}
+{"root":["./src/gamemanager.ts","./src/constants.ts","./src/index.ts","./src/logger.ts","./src/types.ts","./src/utils.ts"],"version":"5.7.3"}
